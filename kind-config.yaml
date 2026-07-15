@@ -1,0 +1,16 @@
+# kind cluster definition.
+#
+# kind = "Kubernetes IN Docker". Each k8s node is a Docker container running on
+# your machine. This file describes what the cluster looks like.
+#
+# For now we keep it dead simple: a single node that acts as both the
+# control-plane (the brain: API server, scheduler) and a worker (runs your pods).
+# In a real cluster these are separate machines; locally, one node is plenty.
+#
+# We'll revisit this file in Phase 5 to add `extraPortMappings` so an Ingress
+# can expose the web app on localhost. Not needed yet.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: job-hunter
+nodes:
+  - role: control-plane

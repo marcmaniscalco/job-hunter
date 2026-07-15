@@ -1,0 +1,70 @@
+# A StatefulSet runs Postgres. Why not a Deployment (the usual workload type)?
+# Deployments assume pods are interchangeable and stateless. A database is
+# neither: it owns data on disk and needs a stable identity. A StatefulSet gives:
+#   1. A predictable pod name: `postgres-0` (not a random hash).
+#   2. A dedicated PersistentVolume that is re-attached to that same pod across
+#      restarts, so the data survives.
+#
+# `serviceName: postgres` links this StatefulSet to the headless Service above.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: job-hunter
+spec:
+  serviceName: postgres
+  replicas: 1                 # a single database instance; no clustering for now
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres         # must match the Service selector above
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - name: postgres
+              containerPort: 5432
+          # Pull each credential from the Secret. The container image reads these
+          # standard POSTGRES_* variables on first boot to create the user/db.
+          envFrom:
+            - secretRef:
+                name: postgres-secret
+          env:
+            # Postgres refuses to initialize into a directory that already
+            # contains files (like the `lost+found` some volumes create). Point
+            # its data dir at a fresh SUBfolder of the mounted volume to avoid it.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          # Probes tell Kubernetes whether the container is alive and ready.
+          # `pg_isready` is Postgres' own health check. Readiness gates traffic;
+          # liveness restarts the pod if it wedges.
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "jobhunter", "-d", "jobhunter"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "jobhunter", "-d", "jobhunter"]
+            initialDelaySeconds: 20
+            periodSeconds: 20
+  # volumeClaimTemplates is the StatefulSet's superpower: it asks Kubernetes to
+  # provision a PersistentVolumeClaim (a chunk of disk) named `data-postgres-0`
+  # and bind it to this pod. kind ships a default storage provisioner, so this
+  # "just works" locally. Delete the pod and the data stays; delete the PVC and
+  # it's gone.
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi

@@ -1,0 +1,10 @@
+# A Namespace is a virtual folder inside the cluster. Grouping all of our objects
+# under `job-hunter` keeps them separate from Kubernetes' own system pods (which
+# live in `kube-system`) and makes cleanup trivial: delete the namespace and
+# everything in it goes with it.
+#
+# Almost every command below uses `-n job-hunter` to target this namespace.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: job-hunter

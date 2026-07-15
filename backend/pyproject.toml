@@ -1,0 +1,23 @@
+[project]
+name = "job-hunter-backend"
+version = "0.1.0"
+description = "Job Hunter backend: FastAPI API + job-source pollers"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",       # ASGI server that runs FastAPI
+    "sqlalchemy>=2.0",               # ORM
+    "psycopg[binary]>=3.2",          # PostgreSQL driver for SQLAlchemy 2.0
+    "pydantic-settings>=2.6",        # load config from environment variables
+    "alembic>=1.14",                 # database migrations (used next increment)
+    "httpx>=0.28",                   # async HTTP client for the pollers (Phase 2)
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+]
+
+# setuptools needs to know our code lives under the `app` package.
+[tool.setuptools.packages.find]
+include = ["app*"]
