@@ -9,8 +9,35 @@ with a Python backend. See `.claude/plans/` for the full phased plan.
 
 ## Prerequisites
 
-Already installed on this machine: Docker Desktop, `kubectl`, `kind`, Python 3.13,
-Node 24. **Docker Desktop must be running** before any cluster work.
+Setting up on a new machine (e.g. a laptop)? Install these first. Commands below
+are for Windows via [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/);
+swap in Homebrew/apt as needed on other OSes.
+
+```powershell
+winget install Docker.DockerDesktop
+winget install Kubernetes.kubectl
+winget install Kubernetes.kind
+winget install Python.Python.3.13
+winget install OpenJS.NodeJS.LTS   # Node 24 — needed starting Phase 3 (React frontend)
+```
+
+Verify:
+
+```bash
+docker --version
+kubectl version --client
+kind version
+python --version     # should be 3.13.x
+node --version       # should be 24.x, needed from Phase 3 onward
+```
+
+**Docker Desktop must be running** before any cluster work (`kind create cluster`,
+`kubectl` against this cluster, etc.) — start it from the Start menu and wait for
+it to report "running" before continuing.
+
+After Docker Desktop is running, jump to [Bring it up from scratch](#bring-it-up-from-scratch)
+below — it covers creating the cluster, Postgres, the backend venv, and running
+the first migration.
 
 ## Architecture (current)
 
@@ -34,11 +61,23 @@ kind create cluster --config kind-config.yaml
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/postgres/
 kubectl wait --for=condition=ready pod/postgres-0 -n job-hunter --timeout=180s
+
+# 3. Port-forward Postgres (leave this running; open a new terminal for step 4):
+kubectl port-forward -n job-hunter svc/postgres 5432:5432
+```
+
+```bash
+# 4. In another terminal — first-time backend setup + run migrations:
+cd backend
+python -m venv .venv
+./.venv/Scripts/python.exe -m pip install -e .
+./.venv/Scripts/alembic.exe upgrade head
 ```
 
 ## Daily dev loop (fast inner loop)
 
-Run the DB in the cluster but the app locally with hot-reload:
+Once the backend venv is set up (see "Bring it up from scratch" above), run the
+DB in the cluster but the app locally with hot-reload:
 
 ```bash
 # Terminal 1 — expose cluster Postgres on localhost:5432
@@ -48,14 +87,6 @@ kubectl port-forward -n job-hunter svc/postgres 5432:5432
 cd backend
 ./.venv/Scripts/python.exe -m uvicorn app.main:app --reload
 # open http://localhost:8000/docs
-```
-
-First-time backend setup:
-
-```bash
-cd backend
-python -m venv .venv
-./.venv/Scripts/python.exe -m pip install -e .
 ```
 
 ## Useful cluster commands
@@ -70,8 +101,9 @@ kind delete cluster --name job-hunter         # tear it all down
 ## Status
 
 - [x] Phase 0 — kind cluster + Postgres (StatefulSet/PVC/Service/Secret)
-- [~] Phase 1 — backend skeleton: FastAPI `/health` + data model (running locally)
-      next: Alembic migration to create tables, then containerize + deploy to k8s
+- [~] Phase 1 — backend skeleton: FastAPI `/health` + data model + Alembic
+      migration (tables created, running locally)
+      next: Dockerfile, then deploy backend to k8s as Deployment + Service
 - [ ] Phase 2 — Greenhouse poller as a CronJob + `GET /jobs`
 - [ ] Phase 3 — React frontend
 - [ ] Phase 4 — saved searches + application tracking + more sources
