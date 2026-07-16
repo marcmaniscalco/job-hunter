@@ -1,0 +1,6 @@
+.venv
+__pycache__
+*.pyc
+job_hunter_backend.egg-info
+.pytest_cache
+.env

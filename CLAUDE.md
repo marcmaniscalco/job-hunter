@@ -41,11 +41,12 @@ Full plan: `docs/PLAN.md`.
 ## Current status
 
 - [x] **Phase 0** — kind cluster + Postgres (StatefulSet, PVC, Service, Secret). Verified.
-- [~] **Phase 1** — backend skeleton: FastAPI `/health` + SQLAlchemy models
-      (companies, jobs, saved_searches, job_status) running locally. Verified.
-      **Next up:** set up Alembic and generate the first migration to create the
-      four tables, then write the Dockerfile and deploy the backend to the cluster
-      as a Deployment + Service.
+- [x] **Phase 1** — backend: FastAPI `/health` + SQLAlchemy models (companies,
+      jobs, saved_searches, job_status); Alembic migration creating all four
+      tables; Dockerfile; deployed to the cluster as a Deployment + Service
+      (DB creds via `backend-secret`, config via `backend-config` ConfigMap,
+      migrations applied by an initContainer on each rollout). Verified via
+      `kubectl port-forward svc/backend` against `/health` and `/docs`.
 - [ ] **Phase 2** — Greenhouse poller as a CronJob + `GET /jobs`.
 - [ ] **Phase 3** — React frontend.
 - [ ] **Phase 4** — saved searches + application tracking + more sources.

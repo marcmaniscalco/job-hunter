@@ -1,0 +1,20 @@
+# Stable in-cluster address for the backend Deployment's pods, and (via
+# port-forward) how we reach it from outside the cluster.
+#
+# Unlike Postgres's headless Service, this is a normal ClusterIP Service: the
+# backend has no per-pod identity to preserve, so plain load-balancing across
+# whichever pods carry the `app: backend` label is exactly what we want.
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: job-hunter
+  labels:
+    app: backend
+spec:
+  selector:
+    app: backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000

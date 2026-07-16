@@ -48,7 +48,12 @@ the first migration.
          └─ Service postgres (headless, :5432)
          └─ Secret postgres-secret (db creds)
 
-  Backend (Python/FastAPI) — runs locally for now, deployed to cluster next.
+         └─ Deployment backend (1 replica)
+              └─ initContainer: alembic upgrade head
+              └─ container: uvicorn (FastAPI app, :8000)
+         └─ Service backend (:8000)
+         └─ Secret backend-secret (DATABASE_URL)
+         └─ ConfigMap backend-config (LOG_LEVEL)
 ```
 
 ## Bring it up from scratch
@@ -74,6 +79,26 @@ python -m venv .venv
 ./.venv/Scripts/alembic.exe upgrade head
 ```
 
+```bash
+# 5. Build the backend image and load it into the cluster, then deploy it.
+# kind's nodes are Docker containers with their own image store, so a locally
+# built image is invisible to them until explicitly loaded — no registry needed.
+cd backend
+docker build -t job-hunter-backend:dev .
+kind load docker-image job-hunter-backend:dev --name job-hunter
+cd ..
+kubectl apply -f k8s/backend/
+kubectl wait --for=condition=ready pod -l app=backend -n job-hunter --timeout=90s
+```
+
+Verify: `kubectl port-forward -n job-hunter svc/backend 8000:8000`, then open
+http://localhost:8000/health and http://localhost:8000/docs.
+
+Made a change to `app/`, `models.py`, or a migration and want it live in the
+cluster? Repeat step 5 (`docker build` → `kind load` → `kubectl rollout restart
+deployment/backend -n job-hunter`) — see the note on the dev loop below for why
+this isn't part of the everyday workflow.
+
 ## Daily dev loop (fast inner loop)
 
 Once the backend venv is set up (see "Bring it up from scratch" above), run the
@@ -95,15 +120,17 @@ cd backend
 kubectl get all -n job-hunter                 # everything in our namespace
 kubectl logs -n job-hunter postgres-0         # database logs
 kubectl exec -it -n job-hunter postgres-0 -- psql -U jobhunter -d jobhunter
+kubectl logs -n job-hunter -l app=backend                # backend API logs
+kubectl logs -n job-hunter -l app=backend -c migrate      # last migration run
 kind delete cluster --name job-hunter         # tear it all down
 ```
 
 ## Status
 
 - [x] Phase 0 — kind cluster + Postgres (StatefulSet/PVC/Service/Secret)
-- [~] Phase 1 — backend skeleton: FastAPI `/health` + data model + Alembic
-      migration (tables created, running locally)
-      next: Dockerfile, then deploy backend to k8s as Deployment + Service
+- [x] Phase 1 — backend: FastAPI `/health` + data model + Alembic migration +
+      Dockerfile, deployed to the cluster as a Deployment + Service (DB creds
+      via Secret, config via ConfigMap, migrations run by an initContainer)
 - [ ] Phase 2 — Greenhouse poller as a CronJob + `GET /jobs`
 - [ ] Phase 3 — React frontend
 - [ ] Phase 4 — saved searches + application tracking + more sources

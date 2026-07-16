@@ -1,0 +1,9 @@
+# Non-sensitive app config lives in a ConfigMap, separate from the Secret above.
+# The Dockerfile's CMD reads LOG_LEVEL to set uvicorn's --log-level.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: job-hunter
+data:
+  LOG_LEVEL: info

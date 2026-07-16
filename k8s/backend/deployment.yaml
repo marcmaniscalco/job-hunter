@@ -1,0 +1,59 @@
+# A Deployment (unlike Postgres's StatefulSet) is the right fit here: the API
+# is stateless — all state lives in Postgres — so pods really are interchangeable.
+# Kubernetes can freely kill/reschedule/replace them without needing stable
+# identity or storage.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: job-hunter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      # initContainers run one at a time, to completion, before any regular
+      # container starts. We use one to apply pending Alembic migrations, so
+      # the schema is always up to date before the API begins serving traffic.
+      initContainers:
+        - name: migrate
+          image: job-hunter-backend:dev
+          imagePullPolicy: IfNotPresent
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - secretRef:
+                name: backend-secret
+      containers:
+        - name: backend
+          image: job-hunter-backend:dev
+          # kind loads this image straight into the cluster's containerd via
+          # `kind load docker-image` — there's no registry to pull from, and
+          # IfNotPresent stops Kubernetes from trying (and failing) to pull one.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: backend-secret
+            - configMapRef:
+                name: backend-config
+          # Reuses the same /health endpoint the plan calls for; a real DB
+          # round-trip means "ready"/"alive" actually mean the whole path works.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
