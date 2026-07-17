@@ -125,12 +125,97 @@ kubectl logs -n job-hunter -l app=backend -c migrate      # last migration run
 kind delete cluster --name job-hunter         # tear it all down
 ```
 
+## FAQ / troubleshooting
+
+**`kubectl get all -n job-hunter` (or similar) says "No resources found", but you know you deployed things.**
+
+Docker Desktop ships its own single-node Kubernetes cluster, separate from the
+`kind` cluster this project uses. Both show up as `kubectl` contexts, and it's
+easy to end up on the wrong one after a reboot — especially if Docker Desktop's
+built-in Kubernetes is also enabled. Check which context you're on and switch if
+needed:
+
+```bash
+kubectl config current-context      # expect: kind-job-hunter
+kubectl config get-contexts         # lists all contexts; * marks the current one
+kubectl config use-context kind-job-hunter
+```
+
+**After restarting my PC, the pods show `RESTARTS` > 0 — did I lose my data?**
+
+No. When Docker Desktop restarts, the kind cluster's node containers restart
+with it, which restarts the pods running on them. `postgres-0`'s data lives on
+its PVC (backed by a volume on disk), not in the container, so it survives.
+Verify any time with:
+
+```bash
+kubectl exec -n job-hunter postgres-0 -- psql -U jobhunter -d jobhunter -c "\dt"
+```
+
+You should see all four tables (`companies`, `jobs`, `saved_searches`,
+`job_status`) plus `alembic_version`.
+
+**I changed a pod spec (e.g. a probe) in `k8s/postgres/statefulset.yaml`, ran
+`kubectl apply`, but the running pod still has the old spec.**
+
+`kubectl apply` updates the StatefulSet object right away, and for most changes
+the StatefulSet controller then rolls existing pods to match automatically. But
+if it doesn't seem to have happened, confirm where the mismatch actually is
+before assuming `apply` is broken — check the StatefulSet's *desired* spec vs
+the *running pod's* spec:
+
+```bash
+kubectl get statefulset postgres -n job-hunter -o jsonpath='{.spec.template.spec.containers[0].readinessProbe.exec.command}'
+kubectl get pod postgres-0 -n job-hunter -o jsonpath='{.spec.containers[0].readinessProbe.exec.command}'
+```
+
+If the StatefulSet already shows your new spec but the pod still shows the old
+one, the rollout just hasn't reached it yet — nudge it along by deleting the
+pod so it's recreated from the current template:
+
+```bash
+kubectl delete pod postgres-0 -n job-hunter
+```
+
+This is safe: `postgres-0`'s data lives on its PVC, not in the pod, so deleting
+the pod (as opposed to the PVC) never touches the data — same guarantee as the
+restart-survival question above.
+
+**`kubectl port-forward` isn't working / "connection refused" hitting `/health`.**
+
+Check whether a `port-forward` is actually running in another terminal — it's
+easy to forget it's not still up. `port-forward` is a **client-side** process,
+not a cluster resource: it's `kubectl` opening a tunnel through the API server
+to one specific pod, for as long as that command keeps running in your
+terminal. Kubernetes itself has no idea it exists. It is *not* something that
+"starts with the cluster" — closing the terminal, Ctrl+C, or the target pod
+restarting all silently kill it, and you just rerun the command to bring it
+back:
+
+```bash
+kubectl port-forward -n job-hunter svc/backend 8000:8000
+```
+
+Also note: you don't need this running for normal day-to-day development —
+that's what the "Daily dev loop" section above is for (local `uvicorn
+--reload` against a port-forwarded Postgres, hitting `localhost:8000`
+directly). `port-forward`ing `svc/backend` itself is only needed when you
+specifically want to check the *in-cluster deployed* version.
+
+If re-running port-forward each time you want to poke the in-cluster backend
+gets annoying, there are real fixes for that (a NodePort + kind port mapping
+for a stable no-command-needed local port, or Ingress for a proper hostname) —
+deliberately deferred to Phase 5 per the plan rather than solved ad hoc now.
+
 ## Status
 
 - [x] Phase 0 — kind cluster + Postgres (StatefulSet/PVC/Service/Secret)
 - [x] Phase 1 — backend: FastAPI `/health` + data model + Alembic migration +
       Dockerfile, deployed to the cluster as a Deployment + Service (DB creds
       via Secret, config via ConfigMap, migrations run by an initContainer)
-- [ ] Phase 2 — Greenhouse poller as a CronJob + `GET /jobs`
+- [x] Phase 2 — Greenhouse poller (fetch/normalize/upsert with dedupe) as a
+      `poll-greenhouse` CronJob; `GET /jobs` + `GET /jobs/{id}` with
+      keyword/remote/company filtering. Seeded: Stripe, Robinhood, Affirm,
+      Brex, Chime.
 - [ ] Phase 3 — React frontend
 - [ ] Phase 4 — saved searches + application tracking + more sources

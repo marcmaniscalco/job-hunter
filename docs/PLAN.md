@@ -88,12 +88,17 @@ job-hunter/
 - Verify: `kubectl port-forward` then hit `/health` and the auto-generated `/docs`.
 - **Teaches:** Dockerfile authoring, Deployment vs Service, Config/Secret injection, DB migrations.
 
-### Phase 2 — First poller, end-to-end data
+### Phase 2 — First poller, end-to-end data  ✅ done
 - `sources/greenhouse.py` fetches + normalizes jobs for 3–5 fintech companies; upsert with dedupe on `(source, source_job_id)`.
 - Package as a **CronJob** (every ~30 min).
 - `GET /jobs` endpoint with basic filtering (keyword, remote, company).
 - Verify: let the CronJob run (or trigger manually), confirm rows in Postgres and JSON from `/jobs`.
 - **Teaches:** CronJob, idempotent pipelines, separating fetch/normalize/store.
+- **Done:** `Company`/`Job` seeded + polled for Stripe, Robinhood, Affirm, Brex,
+  Chime (1,132 jobs, zero dupes on re-run); `GET /jobs` and `GET /jobs/{id}`
+  live; `poll-greenhouse` CronJob deployed and verified via a manual trigger.
+  Known follow-up for Phase 3: Greenhouse's `description` HTML comes back
+  double-escaped and needs unescaping/sanitizing before rendering.
 
 ### Phase 3 — React frontend (the main learning focus)
 - Vite + TS app: a **JobList** page (fetch `/jobs` via TanStack Query, render cards, filter controls) and a **JobDetail** view.

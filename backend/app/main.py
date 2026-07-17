@@ -16,8 +16,11 @@ from sqlalchemy.orm import Session
 from app import models  # noqa: F401
 from app.db import get_db
 
+from app.api.jobs import router as jobs_router
+
 app = FastAPI(title="Job Hunter API", version="0.1.0")
 
+app.include_router(jobs_router)
 
 @app.get("/health")
 def health(db: Session = Depends(get_db)) -> dict:

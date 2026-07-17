@@ -14,6 +14,7 @@ WORKDIR /app
 # reinstalling packages on rebuilds that only change application code.
 COPY pyproject.toml ./
 COPY app ./app
+COPY pollers ./pollers
 
 RUN pip install --no-cache-dir .
 

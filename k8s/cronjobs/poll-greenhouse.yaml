@@ -1,0 +1,27 @@
+# Runs the Greenhouse poller on a schedule. A CronJob just wraps a Job (a
+# run-to-completion pod) with a schedule — same image as the backend
+# Deployment, different command.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: poll-greenhouse
+  namespace: job-hunter
+spec:
+  schedule: "*/30 * * * *"    # every 30 minutes
+  concurrencyPolicy: Forbid    # skip a new run if the last one hasn't finished
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: poll-greenhouse
+              image: job-hunter-backend:dev
+              imagePullPolicy: IfNotPresent
+              command: ["python", "pollers/poll_all.py"]
+              envFrom:
+                - secretRef:
+                    name: backend-secret
+                - configMapRef:
+                    name: backend-config

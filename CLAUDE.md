@@ -47,7 +47,13 @@ Full plan: `docs/PLAN.md`.
       (DB creds via `backend-secret`, config via `backend-config` ConfigMap,
       migrations applied by an initContainer on each rollout). Verified via
       `kubectl port-forward svc/backend` against `/health` and `/docs`.
-- [ ] **Phase 2** — Greenhouse poller as a CronJob + `GET /jobs`.
+- [x] **Phase 2** — Greenhouse poller (`sources/greenhouse.py`, fetch + normalize
+      + upsert with dedupe on `(source, source_job_id)`); `pollers/poll_all.py`
+      entrypoint; `poll-greenhouse` CronJob (every 30 min); `GET /jobs` and
+      `GET /jobs/{id}` with keyword/remote/company filtering. Seeded companies:
+      Stripe, Robinhood, Affirm, Brex, Chime. Verified via manual CronJob
+      trigger, DB row counts (1,132 jobs, no dupes on re-run), and live API
+      queries.
 - [ ] **Phase 3** — React frontend.
 - [ ] **Phase 4** — saved searches + application tracking + more sources.
 
