@@ -54,7 +54,19 @@ Full plan: `docs/PLAN.md`.
       Stripe, Robinhood, Affirm, Brex, Chime. Verified via manual CronJob
       trigger, DB row counts (1,132 jobs, no dupes on re-run), and live API
       queries.
-- [ ] **Phase 3** — React frontend.
+- [x] **Phase 3** — React frontend: Vite + TS + TanStack Query app with
+      `JobList` (live data, loading/error states, keyword/remote/company
+      `FilterBar`) and `JobDetail`; typed API client (`api/types.ts`,
+      `api/client.ts`) mirroring the backend's `JobOut` schema; state lifted
+      rather than prop-drilled, no router yet. Backend gained CORS
+      middleware for the dev server origin. Containerized (multi-stage
+      Dockerfile, nginx serving the build; `VITE_API_BASE` baked in at
+      build time) and deployed as a Deployment + Service in
+      `k8s/frontend/`. Verified via two simultaneous port-forwards
+      (`svc/backend` 8000, `svc/frontend` 5173) showing the live feed,
+      filters, and detail view served entirely from the cluster. Manual
+      walkthrough docs: `docs/manual/01-frontend-scaffold.md`,
+      `02-filter-controls.md`, `03-containerize-deploy.md`.
 - [ ] **Phase 4** — saved searches + application tracking + more sources.
 
 ## Dev loop (fast inner loop)

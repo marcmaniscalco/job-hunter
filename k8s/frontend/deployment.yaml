@@ -1,0 +1,36 @@
+# Deployment, not StatefulSet: like the backend, this is stateless — nginx
+# serving static files has no identity or storage to preserve.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: job-hunter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: job-hunter-frontend:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 20
