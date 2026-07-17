@@ -177,6 +177,23 @@ pod so it's recreated from the current template:
 kubectl delete pod postgres-0 -n job-hunter
 ```
 
+**Running `npm` (or `npm create vite@latest ...`) fails with `File ...\npm.ps1
+cannot be loaded because running scripts is disabled on this system`
+(`PSSecurityException`).**
+
+Windows PowerShell's default execution policy (`Restricted`) blocks all
+`.ps1` scripts, and npm's launcher on Windows is a `.ps1` script. This is a
+one-time, per-user fix — allow locally-created scripts to run (still blocks
+unsigned scripts downloaded from the internet, so it's not a broad security
+loosening):
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+Confirm it took effect: `Get-ExecutionPolicy -Scope CurrentUser` should
+print `RemoteSigned`. Then retry the `npm` command.
+
 This is safe: `postgres-0`'s data lives on its PVC, not in the pod, so deleting
 the pod (as opposed to the PVC) never touches the data — same guarantee as the
 restart-survival question above.
